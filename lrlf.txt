@@ -1,0 +1,115 @@
+#include <stdio.h>
+#include <string.h>
+
+#define MAX_RULES 10
+#define MAX_LEN 100
+
+// Function to eliminate left recursion
+void eliminateLeftRecursion(char lhs, char rhs[MAX_RULES][MAX_LEN], int count, 
+                           char newRhs[MAX_RULES][MAX_LEN], int *newCount) {
+    char alpha[MAX_RULES][MAX_LEN], beta[MAX_RULES][MAX_LEN];
+    int alphaCount = 0, betaCount = 0;
+
+    // Split RHS into alpha (recursive) and beta (non-recursive)
+    for (int i = 0; i < count; i++) {
+        if (rhs[i][0] == lhs) {
+            strcpy(alpha[alphaCount++], rhs[i] + 1);
+        } else {
+            strcpy(beta[betaCount++], rhs[i]);
+        }
+    }
+
+    // If no left recursion, copy original RHS to newRhs
+    if (alphaCount == 0) {
+        for (int i = 0; i < count; i++) {
+            strcpy(newRhs[i], rhs[i]);
+        }
+        *newCount = count;
+        return;
+    }
+
+    // Transform left-recursive grammar
+    *newCount = 0;
+    char newNT = lhs + 1; // Simple way to create new non-terminal (e.g., A -> A')
+    for (int i = 0; i < betaCount; i++) {
+        sprintf(newRhs[*newCount], "%s%c", beta[i], newNT);
+        (*newCount)++;
+    }
+    for (int i = 0; i < alphaCount; i++) {
+        sprintf(newRhs[*newCount], "%s%c", alpha[i], newNT);
+        (*newCount)++;
+    }
+    sprintf(newRhs[*newCount], "ε"); // Add epsilon production
+    (*newCount)++;
+}
+
+// Function to eliminate left factoring
+void eliminateLeftFactoring(char lhs, char rhs[MAX_RULES][MAX_LEN], int count) {
+    char commonPrefix[MAX_LEN];
+    strcpy(commonPrefix, rhs[0]);
+
+    // Find the longest common prefix among RHS alternatives
+    for (int i = 1; i < count; i++) {
+        int j = 0;
+        while (commonPrefix[j] && rhs[i][j] && commonPrefix[j] == rhs[i][j]) {
+            j++;
+        }
+        commonPrefix[j] = '\0';
+    }
+
+    // If no common prefix, print original production
+    if (strlen(commonPrefix) == 0) {
+        printf("%c -> ", lhs);
+        for (int i = 0; i < count; i++) {
+            printf("%s%s", rhs[i], i == count - 1 ? "\n" : " | ");
+        }
+        return;
+    }
+
+    // Factor out the common prefix
+    char newNT = lhs + 1; // New non-terminal (e.g., A -> A')
+    printf("%c -> %s%c\n", lhs, commonPrefix, newNT);
+    printf("%c -> ", newNT);
+    for (int i = 0; i < count; i++) {
+        char *suffix = rhs[i] + strlen(commonPrefix);
+        printf("%s%s", strlen(suffix) > 0 ? suffix : "ε", i == count - 1 ? "\n" : " | ");
+    }
+}
+
+int main() {
+    char lhs;
+    int count;
+    char rhs[MAX_RULES][MAX_LEN];
+    char tempRhs[MAX_RULES][MAX_LEN];
+    int tempCount;
+
+    // Input grammar
+    printf("Enter LHS of production: ");
+    scanf(" %c", &lhs);
+    getchar(); // Clear newline
+
+    printf("Enter number of RHS alternatives: ");
+    scanf("%d", &count);
+    getchar();
+
+    for (int i = 0; i < count; i++) {
+        printf("Enter RHS alternative %d: ", i + 1);
+        fgets(rhs[i], MAX_LEN, stdin);
+        rhs[i][strcspn(rhs[i], "\n")] = 0; // Remove newline
+    }
+
+    // Step 1: Eliminate left recursion
+    eliminateLeftRecursion(lhs, rhs, count, tempRhs, &tempCount);
+
+    // Step 2: Eliminate left factoring on the result
+    printf("\nAfter Left Recursion Elimination and Left Factoring:\n");
+    if (tempCount == count) {
+        // No left recursion was found, apply left factoring directly
+        eliminateLeftFactoring(lhs, rhs, count);
+    } else {
+        // Left recursion was eliminated, now factor the new productions
+        eliminateLeftFactoring(lhs, tempRhs, tempCount);
+    }
+
+    return 0;
+}
